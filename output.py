@@ -8,7 +8,6 @@ width = 50
 
 world = world_gen.WorldGen()
 
-# image = cv2.imread("floorplan_walls.png")
 image = cv2.imread("floorplan_walls.png")
 preset = cv2.imread("floorplan_borders.png")
 
@@ -60,9 +59,6 @@ system = world.generate_world(60, 60, init_world=preset, free_value_index=colors
 # system = world.generate_world(36, 36)
 end_gen = time.process_time_ns()
 print(f"{(end_gen - start_gen)/10**9} seconds to generate world")
-
-#DONE; TODO: CURRENTLY THE BLANK TILE COLOR IS HARD CODED AS COLOR 1 !!!! FIX
-# system = world.generate_world(32,32, init_world=preset, free_value_index=colors.index((255,112,255)))
 
 cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL)
 

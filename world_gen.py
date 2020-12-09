@@ -159,47 +159,21 @@ class WorldGen:
                     patched_init_world[i].append(
                         tuple(init_world[i:i+3, j:j+3].flatten()))
 
-            # print(list(enumerate(self.patches)))
-
             for i in range(len(patched_init_world)):
                 for j in range(len(patched_init_world[i])):
                     if(init_world[i][j] != free_value_index):
 
-                        # FAST, UGLY
-                        # preset_patch = self.patch_index[patched_init_world[i][j]]
-                        # domain_delta = self.domains[i][j] ^ np.where(
-                        #     np.arange(len(self.patches)) == preset_patch, True, False)  # ^ XOR
-
-                        # FAILS ON FIRST LOOP
-                        # preset_patches = [True if p[0]==init_world[i][j] else False for p in self.patches]
-                        # domain_delta = self.domains[i][j] ^ np.array(preset_patches)  # ^ XOR
-
-                        # TODO: use pattern matching between fixed tiles and possible patches they could be in, improving compatibility with generated surroundings
+                        # use pattern matching between fixed tiles and possible patches they could be in, improving compatibility with generated surroundings
                         def patch_match(p):
                             for k in range(len(p)):
                                 if(patched_init_world[i][j][k] != free_value_index and p[k] != patched_init_world[i][j][k]):
                                     return False
                             return True
                         preset_patches = [patch_match(p) for p in self.patches]
+                        # any 0 in preset that is 1 in domain needs to be 1 in delta (i.e. patch removed)
                         domain_delta = self.domains[i][j] & ~np.array(preset_patches)  # ^ XOR
 
-                        # dom: 0,1,1,0   pres: 1,1,0,0   delta: 0,0,1,0
-                        # any 0 in preset that is 1 in domain needs to be 1 in delta (i.e. patch removed)
-
-
-                        # print("\n")
-                        # print("------------------")
-                        # print("\n")
-
-                        # assert sum(domain_delta) == sum(self.domains[i][j]) - sum(preset_patches), f"{i,j}"
-                        # print(patched_init_world[i][j], [p for n,p in enumerate(self.patches) if preset_patches[n]])
-
                         self.propagate((i, j), domain_delta)
-        # np.set_printoptions(threshold=sys.maxsize)
-        # print(np.array(self.adjac_counter)-np.array(old_adjac_counter))
-        # for p in self.domains:
-        #         print([sum(q) for q in p])
-        #         print("\n")
 
     def observe(self):
         min_entropy = float("inf")
@@ -210,7 +184,6 @@ class WorldGen:
                 supersum = sum(self.domains[i][j])
                 if(supersum == 0):
                     # no patch options exist for this cell, so quit
-                    # print(i, j)
                     return None
                 if(supersum == 1):
                     # already collapsed
@@ -221,7 +194,6 @@ class WorldGen:
                 if(self.entropies[i][j][0] < min_entropy):
                     candidates = [(i, j)]
                     min_entropy = self.entropies[i][j][0]
-                    # print(min_entropy)
                 elif(self.entropies[i][j][0] == min_entropy):
                     candidates.append([i, j])
         # randomly chose a candidate and observe (collapse wave function) on them
@@ -232,18 +204,14 @@ class WorldGen:
         patch_probs = patch_probs / np.sum(patch_probs)
         chosen_patch = np.random.choice(
             range(len(self.patches)), p=patch_probs)
-        # print(patch_probs,chosen_patch)
-        # TODO: return cand_pos,domain_delta instead, so the domain isn't changed within observation, only chosen. It is changed in propagate()
         domain_delta = self.domains[cand_pos[0]][cand_pos[1]] ^ np.where(
             np.arange(len(self.patches)) == chosen_patch, True, False)  # ^ XOR
         assert sum(domain_delta) == sum(self.domains[cand_pos[0]][cand_pos[1]]) - sum(np.where(
             range(len(self.patches)) == chosen_patch, True, False))
-        # print(chosen_patch,cand_pos)
         return cand_pos, domain_delta
 
     def propagate(self, start_pos, domain_delta):
         # (pos, tile to remove from domain)
-        # print(entropies)
         stack = []
         # for each True in the domain_delta add the needed remove_tile_possibility arguments as a tuple in stack
         for i in range(len(domain_delta)):
@@ -253,19 +221,14 @@ class WorldGen:
             self.domains[x][y][t] = False
         while(len(stack) > 0):
             # perform tile removal, updating entropies that need recalculation, changed domains and appending new removals stack through reference
-            # print(stack, self.adjac_counter[stack[-1][0][0]][stack[-1][0][1]][stack[-1][1]])
             cell_tile = stack.pop(-1)
             self.remove_tile_possibility(stack, *cell_tile)
-        # DONE; TODO: Initialize array, where we store the count of the support, i.e. for a given cell/tile/side, we count how many tiles in the domain on adjacent cell can be placed next to the tile in question.
-        #       go through adjacent cell's tile values that we know a removed tile on the current cell can be adjacent to and subtract 1. if any of the neighbor tile values are 0, we know this tile has no possible neighbors and can be removed from domain
-        # print(domains)
 
     def remove_tile_possibility(self, stack, pos, tile_ind):
         # iterate through all 4 directions of tile,
         #       subtract 1 from adjac_counter of all possible tiles in neighbor's domain common to adjac,
         #       if 0, add neighbor (pos,tile) to stack
         self.remove_counter += 1
-        # assert self.remove_counter < len(self.domains)*len(self.domains[0])*len(self.patches)
         x, y = pos
         neighbor_pos = []
         if(x > 0):
@@ -282,9 +245,7 @@ class WorldGen:
                     self.adjac_counter[i][j][t][(d+2) % 4] -= 1
                     if(self.adjac_counter[i][j][t][(d+2) % 4] == 0):
                         self.domains[i][j][t] = False
-                        # assert sum(self.domains[i][j])>=1, f"{i,j,t, self.patches[t], stack}"
                         stack.append(((i, j), t))
-                        # print((i,j),t)
                         self.entropies[i][j] = (-1, False)
 
     def calc_entropy(self, superpos):
@@ -309,9 +270,6 @@ class WorldGen:
         return True
 
     def one_index(self, arr):
-        # for i in range(len(arr)):
-        #     if(arr[i]==1):
-        #         return i
         return int(np.nonzero(arr)[0])
 
     def generate_world(self, rows, cols, init_world=None, free_value_index=None):
@@ -326,32 +284,17 @@ class WorldGen:
         while(not self.is_complete()):
             print("OUTPUT INIT")
 
-            # self.init_output(rows, cols,init_world)
             # more efficient to copy than recalculate
             self.domains = copy.deepcopy(temp_doms)
             self.adjac_counter = copy.deepcopy(temp_adjcount)
             self.entropies = copy.deepcopy(temp_ents)
 
-            # for p in self.domains:
-            #     for q in p:
-            #         print([(n,m) for n,m in enumerate(self.patches) if q[n]])
-            #         print("\n")
-
             print(f"COLLAPSING, loop {c}")
-            # print(self.remove_counter, len(self.domains), len(self.domains[0]), len(self.domains[0][0]))
-            # boolean represents if the entropy is up to date
-
-            # print(self.adjac[27])
-            # print(self.adjac[30])
-            # return
 
             while(not self.is_collapsed()):
-                # print(self.adjac_counter)
-
                 temp = self.observe()
                 if(temp):
                     collapsed_pos, domain_delta = temp
-                    # print(collapsed_pos)
                 else:
                     print("Impossible cell.")
                     break
@@ -360,20 +303,7 @@ class WorldGen:
                     return None
                 self.propagate(collapsed_pos, domain_delta)
 
-                # for p in self.domains:
-                #     for q in p:
-                #         print([(n,m) for n,m in enumerate(self.patches) if q[n]])
-                #         print("\n")
-
-                # print("\n ------------------ \n")
-
                 c += 1
-                # if(c>0):
-                #     print(list(enumerate(self.patches)))
-                #     print(self.adjac[34])
-                #     print(self.adjac[20])
-                #     print(self.adjac[15])
-                #     return
 
         print(f"Loops: {c}")
         print("CONVERTING")
