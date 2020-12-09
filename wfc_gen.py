@@ -9,7 +9,8 @@ import sys
 class WorldGen:
 
     def __init__(self):
-
+        """ Input example worlds in 2D grid using process_input, then generate new ones using generate. """
+        
         self.patch_index = {}
         self.patches = []
         self.freqs = []
@@ -20,65 +21,8 @@ class WorldGen:
         self.adjac_counter = []
         self.entropies = []
 
-        self.remove_counter = 0
-
-    def get_input(self):
-        # assume input dimensions >= 3x3
-        width = 25
-        mat_in = [
-            [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-            [' ', ' ', '•', '•', '•', 'D', 'D', '•',
-                '•', ' ', ' ', ' ', ' ', '•', '•', '•'],
-            [' ', ' ', '•', ' ', ' ', ' ', ' ', ' ',
-                '•', ' ', ' ', ' ', ' ', '•', ' ', '•'],
-            [' ', ' ', '•', ' ', ' ', ' ', ' ', ' ',
-                '•', '•', '•', '•', '•', '•', 'D', '•'],
-            ['•', '•', '•', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', '•'],
-            ['•', ' ', 'X', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', 'D', 'X', '•'],
-            ['•', ' ', 'X', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', ' ', ' ', '•'],
-            ['•', ' ', 'D', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', ' ', ' ', '•'],
-            ['•', '•', '•', '•', '•', 'X', 'X', '•',
-                'X', 'X', '•', '•', '•', '•', '•', '•'],
-            [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-            [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-            [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-            [' ', ' ', '•', '•', '•', 'D', 'D', '•',
-                '•', ' ', ' ', ' ', ' ', '•', '•', '•'],
-            [' ', ' ', '•', ' ', ' ', ' ', ' ', ' ',
-                '•', ' ', ' ', ' ', ' ', '•', ' ', '•'],
-            [' ', ' ', '•', ' ', ' ', ' ', ' ', ' ',
-                '•', '•', '•', '•', '•', '•', ' ', '•'],
-            [' ', ' ', '•', '•', '•', 'D', 'D', '•',
-                '•', ' ', ' ', ' ', ' ', ' ', ' ', '•'],
-            [' ', ' ', 'X', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', 'D', '•', '•'],
-            [' ', '•', '•', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', ' ', ' ', '•'],
-            [' ', 'D', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', '•', ' ', ' ', '•'],
-            [' ', '•', 'X', '•', '•', 'X', 'X', '•',
-                '•', '•', '•', '•', '•', '•', '•', '•'],
-            [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '],
-        ]
-        mat_in = np.array([np.concatenate([[' ', ' '], x, [' ', ' ']])
-                           for x in mat_in])
-        for i in range(len(mat_in)):
-            for j in range(len(mat_in[i])):
-                if(mat_in[i][j] == 'D' or mat_in[i][j] == 'X'):
-                    mat_in[i][j] = '•'
-
-        return mat_in
-
     def process_input(self, input):
+        """ Iterates through each 3x3 patch of tile grid input assigning them unique indices (patch_index), keeps track of their occurence count (frequency) and possible adjacent patches (adjac)."""
         n = len(input)
         m = len(input[0])
         input_patched = []
@@ -138,7 +82,8 @@ class WorldGen:
                     self.adjac[indexed_input[i][j]][3].add(
                         indexed_input[i][j-1])
 
-    def init_output(self, rows, cols, init_world=None, free_value_index=None):
+    def init_output(self, rows, cols, init_tiles=None, free_value_index=None):
+        """ Initialize output for generation function with a domain, adjac_counter and entropy value for each tile in output grid. Propagate any preset tiles (init_tiles) to reflect changes in output. """
 
         self.domains = [[[True for _ in self.patches]
                          for _ in range(cols)] for _ in range(rows)]
@@ -151,31 +96,33 @@ class WorldGen:
         self.entropies = [[(-1, False) for _ in range(cols)]
                           for _ in range(rows)]
 
-        if(init_world is not None):
-            patched_init_world = []
-            for i in range(min(len(init_world)-2, rows-2)):
-                patched_init_world.append([])
-                for j in range(min(len(init_world[i])-2, cols-2)):
-                    patched_init_world[i].append(
-                        tuple(init_world[i:i+3, j:j+3].flatten()))
+        if(init_tiles is not None):
+            patches_init_tiles = []
+            for i in range(min(len(init_tiles)-2, rows-2)):
+                patches_init_tiles.append([])
+                for j in range(min(len(init_tiles[i])-2, cols-2)):
+                    patches_init_tiles[i].append(
+                        tuple(init_tiles[i:i+3, j:j+3].flatten()))
 
-            for i in range(len(patched_init_world)):
-                for j in range(len(patched_init_world[i])):
-                    if(init_world[i][j] != free_value_index):
+            for i in range(len(patches_init_tiles)):
+                for j in range(len(patches_init_tiles[i])):
+                    if(init_tiles[i][j] != free_value_index):
 
                         # use pattern matching between fixed tiles and possible patches they could be in, improving compatibility with generated surroundings
                         def patch_match(p):
                             for k in range(len(p)):
-                                if(patched_init_world[i][j][k] != free_value_index and p[k] != patched_init_world[i][j][k]):
+                                if(patches_init_tiles[i][j][k] != free_value_index and p[k] != patches_init_tiles[i][j][k]):
                                     return False
                             return True
                         preset_patches = [patch_match(p) for p in self.patches]
                         # any 0 in preset that is 1 in domain needs to be 1 in delta (i.e. patch removed)
-                        domain_delta = self.domains[i][j] & ~np.array(preset_patches)  # ^ XOR
+                        domain_delta = self.domains[i][j] & ~np.array(
+                            preset_patches)  # ^ XOR
 
                         self.propagate((i, j), domain_delta)
 
     def observe(self):
+        """ Find the tile which has the least entropy of possible patches that it is the top left tile to and randomly select one of those patches using their frequency. Return the tile position and the delta in domain required (only True for the selected patch now) """
         min_entropy = float("inf")
         # find selection of min-entropy candidate cells to observe
         candidates = []
@@ -211,24 +158,26 @@ class WorldGen:
         return cand_pos, domain_delta
 
     def propagate(self, start_pos, domain_delta):
-        # (pos, tile to remove from domain)
+        """ Take the domain delta and apply the change to the tile position given. Maintain a stack as a depth first search removes tile possibilities from its neighbors. """
+        # (pos, patch to remove from domain)
         stack = []
         # for each True in the domain_delta add the needed remove_tile_possibility arguments as a tuple in stack
         for i in range(len(domain_delta)):
             if(domain_delta[i]):
                 stack.append((start_pos, i))
-        for (x, y), t in stack:
-            self.domains[x][y][t] = False
+        # update selected patch domain
+        for (x, y), p in stack:
+            self.domains[x][y][p] = False
         while(len(stack) > 0):
             # perform tile removal, updating entropies that need recalculation, changed domains and appending new removals stack through reference
             cell_tile = stack.pop(-1)
             self.remove_tile_possibility(stack, *cell_tile)
 
-    def remove_tile_possibility(self, stack, pos, tile_ind):
+    def remove_tile_possibility(self, stack, pos, patch_ind):
+        """ The tile_ind at the given position has been marked as not possible. This affects the possible patches the neighboring tiles could be top left of, since if a patch has 0 possible neighbors it cannot exist either. """
         # iterate through all 4 directions of tile,
         #       subtract 1 from adjac_counter of all possible tiles in neighbor's domain common to adjac,
         #       if 0, add neighbor (pos,tile) to stack
-        self.remove_counter += 1
         x, y = pos
         neighbor_pos = []
         if(x > 0):
@@ -240,20 +189,24 @@ class WorldGen:
         if(y > 0):
             neighbor_pos.append((x, y-1, 3))
         for i, j, d in neighbor_pos:
-            for t in self.adjac[tile_ind][d]:
-                if(self.domains[i][j][t]):
-                    self.adjac_counter[i][j][t][(d+2) % 4] -= 1
-                    if(self.adjac_counter[i][j][t][(d+2) % 4] == 0):
-                        self.domains[i][j][t] = False
-                        stack.append(((i, j), t))
+            for p in self.adjac[patch_ind][d]:
+                if(self.domains[i][j][p]):
+                    # update possible adjacent patches in opposite direction (d+2)%4 now that the input patch is not possible at pos
+                    self.adjac_counter[i][j][p][(d+2) % 4] -= 1
+                    # if there are no available adjacent patches p can be a neighbor of, it is not possible either
+                    if(self.adjac_counter[i][j][p][(d+2) % 4] == 0):
+                        self.domains[i][j][p] = False
+                        stack.append(((i, j), p))
                         self.entropies[i][j] = (-1, False)
 
     def calc_entropy(self, superpos):
+        """ Calculate the entropy of a tile in output grid using its possible patches. The lower the entropy, . """
         # (1 if possible patch else 0) * (Prob of patch) * (binary information provided by patch probability) -> Shannon Entropy
-        entropy = sum(np.array(superpos)*self.freqs*self.logged_freqs)
+        entropy = -sum(np.array(superpos)*self.freqs*self.logged_freqs)
         return entropy
 
     def is_collapsed(self):
+        """ Check each tile has collapsed i.e. no tile has more than 1 possible patch """
         for i in self.domains:
             for j in i:
                 # at least one uncollapsed cell
@@ -262,19 +215,19 @@ class WorldGen:
         return True
 
     def is_complete(self):
+        """ Check output is ready i.e. each tile has exactly one possible patch. If they have less, there is no possible patch at that location. """
         for i in self.domains:
             for j in i:
-                # at least one uncollapsed cell
+                # cell is either uncollapsed or impossible to select a patch for e.g. other patch selections made the tile domain fully False
                 if(sum(j) != 1):
                     return False
         return True
 
-    def one_index(self, arr):
-        return int(np.nonzero(arr)[0])
+    def generate(self, rows, cols, init_tiles=None, free_value_index=None):
+        """ Takes output size in rows, cols and gives the option for preset tiles to accomodate for, as well as a free_value tile, where the algorithm can choose what to place according to the preset tiles. """
 
-    def generate_world(self, rows, cols, init_world=None, free_value_index=None):
         print("INIT OUTPUT")
-        self.init_output(rows, cols, init_world, free_value_index)
+        self.init_output(rows, cols, init_tiles, free_value_index)
 
         temp_doms = copy.deepcopy(self.domains)
         temp_adjcount = copy.deepcopy(self.adjac_counter)
@@ -282,8 +235,6 @@ class WorldGen:
 
         c = 0
         while(not self.is_complete()):
-            print("OUTPUT INIT")
-
             # more efficient to copy than recalculate
             self.domains = copy.deepcopy(temp_doms)
             self.adjac_counter = copy.deepcopy(temp_adjcount)
@@ -308,4 +259,4 @@ class WorldGen:
         print(f"Loops: {c}")
         print("CONVERTING")
         print(f"PATCHES: {len(self.patches)}")
-        return np.array([[self.patches[self.one_index(j)][0] for j in i] for i in self.domains])
+        return np.array([[self.patches[int(np.nonzero(j)[0])][0] for j in i] for i in self.domains])
