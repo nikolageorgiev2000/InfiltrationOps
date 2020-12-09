@@ -8,8 +8,9 @@ width = 50
 
 world = world_gen.WorldGen()
 
+# image = cv2.imread("floorplan_walls.png")
 image = cv2.imread("floorplan_walls.png")
-preset = cv2.imread("floorplan_borders32.png")
+preset = cv2.imread("floorplan_borders.png")
 
 colors = set()
 for i in image:
@@ -43,6 +44,7 @@ mat_270 = np.rot90(mat_180)
 def convert(arr,conv):
     return np.array([[conv[c] for c in i] for i in arr])
 
+start_processing_input = time.process_time_ns()
 world.process_input(mat_in)
 world.process_input(mat_horiz)
 world.process_input(mat_diag)
@@ -50,8 +52,14 @@ world.process_input(mat_vert)
 world.process_input(mat_90)
 world.process_input(mat_180)
 world.process_input(mat_270)
+end_processing_input = time.process_time_ns()
+print(f"{(end_processing_input - start_processing_input)/10**9} seconds to process input")
 
-system = world.generate_world(4, 4, init_world=preset, free_value_index=colors.index((255,112,255)))
+start_gen = time.process_time_ns()
+system = world.generate_world(60, 60, init_world=preset, free_value_index=colors.index((255,112,255)))
+# system = world.generate_world(36, 36)
+end_gen = time.process_time_ns()
+print(f"{(end_gen - start_gen)/10**9} seconds to generate world")
 
 #DONE; TODO: CURRENTLY THE BLANK TILE COLOR IS HARD CODED AS COLOR 1 !!!! FIX
 # system = world.generate_world(32,32, init_world=preset, free_value_index=colors.index((255,112,255)))

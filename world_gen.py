@@ -3,6 +3,7 @@ import numpy as np
 import random
 import copy
 import math
+import sys
 
 
 class WorldGen:
@@ -18,6 +19,8 @@ class WorldGen:
         self.domains = []
         self.adjac_counter = []
         self.entropies = []
+
+        self.remove_counter = 0
 
     def get_input(self):
         # assume input dimensions >= 3x3
@@ -114,7 +117,7 @@ class WorldGen:
         # self.freqs = [x*patch_entropy(i) for i, x in enumerate(self.freqs)]
         # Activate by uncommenting ^^^
 
-        self.logged_freqs = np.log2(1/np.array(self.freqs))
+        self.logged_freqs = np.log2(np.array(self.freqs))
 
         # update adjacency list with new information from input
         indexed_input = [[self.patch_index[j]
@@ -143,6 +146,8 @@ class WorldGen:
         self.adjac_counter = [[[[len(a) for a in self.adjac[p]] for p in range(
             len(self.patches))] for _ in range(cols)] for _ in range(rows)]
 
+        old_adjac_counter = copy.deepcopy(self.adjac_counter)
+
         self.entropies = [[(-1, False) for _ in range(cols)]
                           for _ in range(rows)]
 
@@ -153,6 +158,8 @@ class WorldGen:
                 for j in range(min(len(init_world[i])-2, cols-2)):
                     patched_init_world[i].append(
                         tuple(init_world[i:i+3, j:j+3].flatten()))
+
+            # print(list(enumerate(self.patches)))
 
             for i in range(len(patched_init_world)):
                 for j in range(len(patched_init_world[i])):
@@ -174,10 +181,25 @@ class WorldGen:
                                     return False
                             return True
                         preset_patches = [patch_match(p) for p in self.patches]
-                        domain_delta = self.domains[i][j] ^ np.array(preset_patches)  # ^ XOR
+                        domain_delta = self.domains[i][j] & ~np.array(preset_patches)  # ^ XOR
+
+                        # dom: 0,1,1,0   pres: 1,1,0,0   delta: 0,0,1,0
+                        # any 0 in preset that is 1 in domain needs to be 1 in delta (i.e. patch removed)
+
+
+                        # print("\n")
+                        # print("------------------")
+                        # print("\n")
+
+                        # assert sum(domain_delta) == sum(self.domains[i][j]) - sum(preset_patches), f"{i,j}"
                         # print(patched_init_world[i][j], [p for n,p in enumerate(self.patches) if preset_patches[n]])
 
                         self.propagate((i, j), domain_delta)
+        # np.set_printoptions(threshold=sys.maxsize)
+        # print(np.array(self.adjac_counter)-np.array(old_adjac_counter))
+        # for p in self.domains:
+        #         print([sum(q) for q in p])
+        #         print("\n")
 
     def observe(self):
         min_entropy = float("inf")
@@ -188,7 +210,7 @@ class WorldGen:
                 supersum = sum(self.domains[i][j])
                 if(supersum == 0):
                     # no patch options exist for this cell, so quit
-                    print(i, j)
+                    # print(i, j)
                     return None
                 if(supersum == 1):
                     # already collapsed
@@ -199,6 +221,7 @@ class WorldGen:
                 if(self.entropies[i][j][0] < min_entropy):
                     candidates = [(i, j)]
                     min_entropy = self.entropies[i][j][0]
+                    # print(min_entropy)
                 elif(self.entropies[i][j][0] == min_entropy):
                     candidates.append([i, j])
         # randomly chose a candidate and observe (collapse wave function) on them
@@ -209,7 +232,7 @@ class WorldGen:
         patch_probs = patch_probs / np.sum(patch_probs)
         chosen_patch = np.random.choice(
             range(len(self.patches)), p=patch_probs)
-
+        # print(patch_probs,chosen_patch)
         # TODO: return cand_pos,domain_delta instead, so the domain isn't changed within observation, only chosen. It is changed in propagate()
         domain_delta = self.domains[cand_pos[0]][cand_pos[1]] ^ np.where(
             np.arange(len(self.patches)) == chosen_patch, True, False)  # ^ XOR
@@ -230,10 +253,9 @@ class WorldGen:
             self.domains[x][y][t] = False
         while(len(stack) > 0):
             # perform tile removal, updating entropies that need recalculation, changed domains and appending new removals stack through reference
-            # print(stack)
+            # print(stack, self.adjac_counter[stack[-1][0][0]][stack[-1][0][1]][stack[-1][1]])
             cell_tile = stack.pop(-1)
             self.remove_tile_possibility(stack, *cell_tile)
-
         # DONE; TODO: Initialize array, where we store the count of the support, i.e. for a given cell/tile/side, we count how many tiles in the domain on adjacent cell can be placed next to the tile in question.
         #       go through adjacent cell's tile values that we know a removed tile on the current cell can be adjacent to and subtract 1. if any of the neighbor tile values are 0, we know this tile has no possible neighbors and can be removed from domain
         # print(domains)
@@ -242,6 +264,8 @@ class WorldGen:
         # iterate through all 4 directions of tile,
         #       subtract 1 from adjac_counter of all possible tiles in neighbor's domain common to adjac,
         #       if 0, add neighbor (pos,tile) to stack
+        self.remove_counter += 1
+        # assert self.remove_counter < len(self.domains)*len(self.domains[0])*len(self.patches)
         x, y = pos
         neighbor_pos = []
         if(x > 0):
@@ -260,6 +284,7 @@ class WorldGen:
                         self.domains[i][j][t] = False
                         # assert sum(self.domains[i][j])>=1, f"{i,j,t, self.patches[t], stack}"
                         stack.append(((i, j), t))
+                        # print((i,j),t)
                         self.entropies[i][j] = (-1, False)
 
     def calc_entropy(self, superpos):
@@ -290,9 +315,9 @@ class WorldGen:
         return int(np.nonzero(arr)[0])
 
     def generate_world(self, rows, cols, init_world=None, free_value_index=None):
-        print("PROCESS")
-
+        print("INIT OUTPUT")
         self.init_output(rows, cols, init_world, free_value_index)
+
         temp_doms = copy.deepcopy(self.domains)
         temp_adjcount = copy.deepcopy(self.adjac_counter)
         temp_ents = copy.deepcopy(self.entropies)
@@ -307,13 +332,26 @@ class WorldGen:
             self.adjac_counter = copy.deepcopy(temp_adjcount)
             self.entropies = copy.deepcopy(temp_ents)
 
+            # for p in self.domains:
+            #     for q in p:
+            #         print([(n,m) for n,m in enumerate(self.patches) if q[n]])
+            #         print("\n")
+
             print(f"COLLAPSING, loop {c}")
+            # print(self.remove_counter, len(self.domains), len(self.domains[0]), len(self.domains[0][0]))
             # boolean represents if the entropy is up to date
 
+            # print(self.adjac[27])
+            # print(self.adjac[30])
+            # return
+
             while(not self.is_collapsed()):
+                # print(self.adjac_counter)
+
                 temp = self.observe()
                 if(temp):
                     collapsed_pos, domain_delta = temp
+                    # print(collapsed_pos)
                 else:
                     print("Impossible cell.")
                     break
@@ -321,7 +359,21 @@ class WorldGen:
                     # got stuck, found non-collapsable cell
                     return None
                 self.propagate(collapsed_pos, domain_delta)
+
+                # for p in self.domains:
+                #     for q in p:
+                #         print([(n,m) for n,m in enumerate(self.patches) if q[n]])
+                #         print("\n")
+
+                # print("\n ------------------ \n")
+
                 c += 1
+                # if(c>0):
+                #     print(list(enumerate(self.patches)))
+                #     print(self.adjac[34])
+                #     print(self.adjac[20])
+                #     print(self.adjac[15])
+                #     return
 
         print(f"Loops: {c}")
         print("CONVERTING")
