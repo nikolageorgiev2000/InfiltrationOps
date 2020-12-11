@@ -10,7 +10,7 @@ class WorldGen:
 
     def __init__(self):
         """ Input example worlds in 2D grid using process_input, then generate new ones using generate. """
-        
+
         self.patch_index = {}
         self.patches = []
         self.freqs = []
@@ -98,9 +98,9 @@ class WorldGen:
 
         if(init_tiles is not None):
             patches_init_tiles = []
-            for i in range(min(len(init_tiles)-2, rows-2)):
+            for i in range(min(len(init_tiles)-2, rows)):
                 patches_init_tiles.append([])
-                for j in range(min(len(init_tiles[i])-2, cols-2)):
+                for j in range(min(len(init_tiles[i])-2, cols)):
                     patches_init_tiles[i].append(
                         tuple(init_tiles[i:i+3, j:j+3].flatten()))
 
